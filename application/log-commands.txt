@@ -1,0 +1,37 @@
+# TalentPivot Backend Log Commands
+# Copy and paste these commands in your terminal to view different types of logs
+
+## 🔍 1. VIEW RECENT BACKEND LOGS (Last 50 entries)
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend" --project=ltc-reboot25-team-51 --limit=50 --format="table(timestamp,severity,textPayload)" --freshness=1d
+
+## 🗄️ 2. VIEW DATABASE-RELATED LOGS
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend AND (textPayload:\"SQL\" OR textPayload:\"database\" OR textPayload:\"mysql\" OR textPayload:\"mssql\" OR textPayload:\"connection\")" --project=ltc-reboot25-team-51 --limit=30 --format="table(timestamp,severity,textPayload)" --freshness=1d
+
+## ❌ 3. VIEW ERROR LOGS ONLY
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend AND severity>=ERROR" --project=ltc-reboot25-team-51 --limit=30 --format="table(timestamp,severity,textPayload)" --freshness=1d
+
+## 🔄 4. REAL-TIME LOG STREAMING (Press Ctrl+C to stop)
+gcloud logging tail "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend" --project=ltc-reboot25-team-51 --format="table(timestamp,severity,textPayload)"
+
+## 🕐 5. LOGS FROM LAST HOUR
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend" --project=ltc-reboot25-team-51 --format="table(timestamp,severity,textPayload)" --freshness=1h
+
+## 🔍 6. SEARCH FOR SPECIFIC TERMS (replace "YOUR_SEARCH_TERM" with what you're looking for)
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend AND textPayload:\"YOUR_SEARCH_TERM\"" --project=ltc-reboot25-team-51 --limit=20 --format="table(timestamp,severity,textPayload)" --freshness=1d
+
+## 📊 7. VIEW LOGS WITH JSON OUTPUT (for detailed analysis)
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend" --project=ltc-reboot25-team-51 --limit=10 --format=json --freshness=1d
+
+## 🌐 8. OPEN LOGS IN GOOGLE CLOUD CONSOLE
+# Visit this URL in your browser:
+# https://console.cloud.google.com/run/detail/us-central1/talentpivot-backend/logs?project=ltc-reboot25-team-51
+
+## 💡 EXAMPLES OF COMMON SEARCHES:
+# Search for authentication issues:
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend AND (textPayload:\"auth\" OR textPayload:\"login\" OR textPayload:\"token\")" --project=ltc-reboot25-team-51 --limit=20 --format="table(timestamp,severity,textPayload)" --freshness=1d
+
+# Search for API requests:
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend AND (textPayload:\"POST\" OR textPayload:\"GET\" OR textPayload:\"PUT\" OR textPayload:\"DELETE\")" --project=ltc-reboot25-team-51 --limit=20 --format="table(timestamp,severity,textPayload)" --freshness=1d
+
+# Search for campaign-related logs:
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend AND textPayload:\"campaign\"" --project=ltc-reboot25-team-51 --limit=20 --format="table(timestamp,severity,textPayload)" --freshness=1d

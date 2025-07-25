@@ -1,0 +1,52 @@
+📱 GOOGLE CLOUD CONSOLE LOG ACCESS
+=====================================
+
+1. 🌐 Direct Links to Your Logs:
+
+   Backend Logs:
+   https://console.cloud.google.com/run/detail/us-central1/talentpivot-backend/logs?project=ltc-reboot25-team-51
+
+   Frontend Logs:
+   https://console.cloud.google.com/run/detail/us-central1/talentpivot-frontend/logs?project=ltc-reboot25-team-51
+
+   All Cloud Run Logs:
+   https://console.cloud.google.com/logs/query?project=ltc-reboot25-team-51
+
+2. 🔍 Log Query Examples (Use in Cloud Console):
+
+   # All backend logs
+   resource.type="cloud_run_revision"
+   resource.labels.service_name="talentpivot-backend"
+
+   # Database-related logs only
+   resource.type="cloud_run_revision"
+   resource.labels.service_name="talentpivot-backend"
+   (textPayload:"SQL" OR textPayload:"database" OR textPayload:"mysql" OR textPayload:"mssql")
+
+   # Error logs only
+   resource.type="cloud_run_revision"
+   resource.labels.service_name="talentpivot-backend"
+   severity>=ERROR
+
+   # Authentication logs
+   resource.type="cloud_run_revision"
+   resource.labels.service_name="talentpivot-backend"
+   (textPayload:"auth" OR textPayload:"login" OR textPayload:"token")
+
+   # Campaign-related logs
+   resource.type="cloud_run_revision"
+   resource.labels.service_name="talentpivot-backend"
+   textPayload:"campaign"
+
+3. 🛠️ How to Use:
+   - Click on any of the links above
+   - Log in to Google Cloud Console with your account
+   - Use the query examples in the log viewer
+   - Set time ranges to filter by specific periods
+   - Export logs if needed for analysis
+
+4. 📊 Log Analysis Tips:
+   - Use severity filters (ERROR, WARNING, INFO)
+   - Set custom time ranges
+   - Use textPayload filters for specific content
+   - Export logs to BigQuery for advanced analysis

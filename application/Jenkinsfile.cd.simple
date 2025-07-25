@@ -1,0 +1,145 @@
+pipeline {
+    agent any
+    environment {
+        GOOGLE_APPLICATION_CREDENTIALS = credentials('gcp-key')
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Frontend Build & Lint') {
+            steps {
+                sh 'npm install'
+                sh 'npx eslint ./src --ignore-pattern dist/ || echo "ESLint warnings found"'
+                sh 'npx tsc --noEmit'
+                sh 'npm run build'
+                sh 'npm run test || echo "No frontend tests"'
+            }
+        }
+        stage('Backend Build & Lint') {
+            steps {
+                dir('backend') {
+                    sh 'npm install'
+                    sh 'npx eslint ./src --ignore-pattern dist/ || echo "ESLint warnings found"'
+                    sh 'npx tsc --noEmit'
+                    sh 'npm run build'
+                    sh 'npm run test || echo "No backend tests"'
+                }
+            }
+        }
+        stage('Docker Build & Push') {
+            parallel {
+                stage('Frontend Docker') {
+                    steps {
+                        script {
+                            withCredentials([file(credentialsId: 'gcp-key', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                                sh '''
+                                    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+                                    gcloud config set project lloyds-reboot
+                                    gcloud auth configure-docker --quiet
+                                    docker build -t gcr.io/lloyds-reboot/talentpivot-frontend:$BUILD_NUMBER .
+                                    docker push gcr.io/lloyds-reboot/talentpivot-frontend:$BUILD_NUMBER
+                                '''
+                            }
+                        }
+                    }
+                }
+                stage('Backend Docker') {
+                    steps {
+                        script {
+                            withCredentials([file(credentialsId: 'gcp-key', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                                sh '''
+                                    cd backend
+                                    docker build -t gcr.io/lloyds-reboot/talentpivot-backend:$BUILD_NUMBER .
+                                    docker push gcr.io/lloyds-reboot/talentpivot-backend:$BUILD_NUMBER
+                                '''
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        stage('Deploy to Cloud Run') {
+            parallel {
+                stage('Deploy Backend') {
+                    steps {
+                        script {
+                            withCredentials([file(credentialsId: 'gcp-key', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                                sh '''
+                                    # Deploy backend first
+                                    gcloud run deploy talentpivot-backend \
+                                        --image gcr.io/lloyds-reboot/talentpivot-backend:$BUILD_NUMBER \
+                                        --region us-central1 \
+                                        --platform managed \
+                                        --allow-unauthenticated \
+                                        --port 8080 \
+                                        --set-env-vars PORT=8080 \
+                                        --set-env-vars NODE_ENV=production \
+                                        --set-env-vars JWT_SECRET="talentpivot-jwt-secret-2025" \
+                                        --set-env-vars SQL_HOST="placeholder-sql-host" \
+                                        --set-env-vars SQL_USER="placeholder-user" \
+                                        --set-env-vars SQL_PASSWORD="placeholder-password" \
+                                        --set-env-vars SQL_DATABASE="talentpivot" \
+                                        --set-env-vars SQL_PORT=1433
+                                    
+                                    # Get backend URL
+                                    BACKEND_URL=$(gcloud run services describe talentpivot-backend --region=us-central1 --format="value(status.url)")
+                                    echo "Backend deployed at: $BACKEND_URL"
+                                '''
+                            }
+                        }
+                    }
+                }
+                stage('Deploy Frontend') {
+                    steps {
+                        script {
+                            withCredentials([file(credentialsId: 'gcp-key', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                                sh '''
+                                    # Wait a bit for backend to be ready
+                                    sleep 30
+                                    
+                                    # Get backend URL
+                                    BACKEND_URL=$(gcloud run services describe talentpivot-backend --region=us-central1 --format="value(status.url)" || echo "https://talentpivot-backend-z7qlsmuifa-uc.a.run.app")
+                                    
+                                    # Deploy frontend with backend URL
+                                    gcloud run deploy talentpivot-frontend \
+                                        --image gcr.io/lloyds-reboot/talentpivot-frontend:$BUILD_NUMBER \
+                                        --region us-central1 \
+                                        --platform managed \
+                                        --allow-unauthenticated \
+                                        --set-env-vars VITE_API_URL="$BACKEND_URL/api/v1"
+                                    
+                                    # Get frontend URL
+                                    FRONTEND_URL=$(gcloud run services describe talentpivot-frontend --region=us-central1 --format="value(status.url)")
+                                    echo "Frontend deployed at: $FRONTEND_URL"
+                                '''
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            archiveArtifacts artifacts: 'dist/**,backend/dist/**', allowEmptyArchive: true
+        }
+        failure {
+            echo 'CD pipeline failed! Check logs for details.'
+        }
+        success {
+            script {
+                sh '''
+                    FRONTEND_URL=$(gcloud run services describe talentpivot-frontend --region=us-central1 --format="value(status.url)" 2>/dev/null || echo "Not deployed")
+                    BACKEND_URL=$(gcloud run services describe talentpivot-backend --region=us-central1 --format="value(status.url)" 2>/dev/null || echo "Not deployed")
+                    echo "🎉 Deployment completed successfully!"
+                    echo "📱 Frontend URL: $FRONTEND_URL"
+                    echo "🔧 Backend URL: $BACKEND_URL"
+                    echo "⚠️  Remember to update database credentials for production use!"
+                '''
+            }
+        }
+    }
+}

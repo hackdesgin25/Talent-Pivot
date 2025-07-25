@@ -1,0 +1,26 @@
+# Add this to your Jenkins pipeline or deployment script to automatically show logs after deployment
+
+# In Jenkinsfile.cd, add this stage after deployment:
+stage('Show Recent Logs') {
+    steps {
+        script {
+            withCredentials([file(credentialsId: 'gcp-key', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+                sh '''
+                    echo "=== Recent Backend Logs ==="
+                    gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend" \
+                        --project=${GCP_PROJECT_ID} \
+                        --limit=20 \
+                        --format="table(timestamp,severity,textPayload)" \
+                        --freshness=1h
+                    
+                    echo "=== Database-related Logs ==="
+                    gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=talentpivot-backend AND (textPayload:\"SQL\" OR textPayload:\"database\" OR textPayload:\"mysql\" OR textPayload:\"mssql\")" \
+                        --project=${GCP_PROJECT_ID} \
+                        --limit=10 \
+                        --format="table(timestamp,severity,textPayload)" \
+                        --freshness=1h
+                '''
+            }
+        }
+    }
+}
